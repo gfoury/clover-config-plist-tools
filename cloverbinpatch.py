@@ -75,7 +75,6 @@ parser.add_argument("dsdt", type=argparse.FileType("rb"), nargs='+', metavar="DS
                     help="One or more DSDT.aml/SSDT.aml files.")
 
 args = parser.parse_args()
-print args
 dir = None
 if args.output_directory:
     dir = args.output_directory[0]
