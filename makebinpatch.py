@@ -20,8 +20,9 @@ def parsehex(s):
 parser = argparse.ArgumentParser(
     description="Print plist binary patch stanzas",
     epilog="example: makebinpatch.py 'ABC\\x00' '\\x80EF\\xFF' 'Change ABC to EF'")
-parser.add_argument("--whole", "-w", help="Generate a complete plist, not just a stanza", action="store_true")
-parser.add_argument("--clover", help="Generate Clover ACPI/DSDT/Patches wrapper", action="store_true")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("--whole", "-w", help="Generate a complete plist, not just a stanza", action="store_true")
+group.add_argument("--clover", help="Generate Clover ACPI/DSDT/Patches wrapper", action="store_true")
 parser.add_argument("--hex", "-x", help="Interpret arguments as hex rather than Python string syntax", action="store_true")
 parser.add_argument("find", help="Python syntax string to find")
 parser.add_argument("replace", help="Python syntax string to replace")
