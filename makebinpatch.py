@@ -2,9 +2,9 @@
 import sys
 import plistlib
 import argparse
+import collections
 
 from io import BytesIO
-
 
 def parsestr(s):
     assert isinstance(s, str)

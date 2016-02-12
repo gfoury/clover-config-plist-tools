@@ -12,6 +12,13 @@ class Patch:
         self.comment = p.get("Comment")
         if self.comment is not None:
             assert isinstance(self.comment, str)
+        self.disabled = p.get("Disabled", False)
+        assert isinstance(self.disabled, bool)
+        self.has_expected = False
+        self.expected = p.get("Expect")
+        if self.expected is not None:
+            assert isinstance(self.expected, int)
+            self.has_expected = True
         self.applied_count = 0
         self.applied_file_count = 0
         self.check()
@@ -25,16 +32,33 @@ class Patch:
             raise ValueError
 
     def count(self, s):
+        # if self.disabled:
+        #     return 0
         return s.count(self.find)
 
     def apply(self, s):
+        # if self.disabled:
+        #     return s
         rv = s.replace(self.find, self.replace)
         assert len(rv) == len(s)
         return rv
 
+    def matches_expected(self, count):
+        if not self.has_expected:
+            return True
+        return self.expected == count
+
+    def _repr_list(self):
+        l = ["Find", repr(self.find), "Replace", repr(self.replace),
+             "Disabled", repr(self.disabled)]
+        if self.has_expected:
+            l += ["Expect", repr(self.expected)]
+        if self.comment:
+            l += ["Comment", repr(self.comment)]
+        return l
     def __repr__(self):
-        return "<Patch: Find {!r} Replace {!r} Comment {!r}>".format(
-            self.find, self.replace, self.comment)
+        l = self._repr_list()
+        return "<" + str(self.__class__) + ": " + " ".join(l) +">"
 
     @classmethod
     def list_from_clover_config(cls, config):
@@ -58,9 +82,14 @@ class Patch:
 class FilePatch(Patch):
     def __init__(self, p):
         assert isinstance(p, dict)
-        self.filename = p["Name"]
-        assert isinstance(self.filename, str)
+        fn = p["Name"]
+        assert isinstance(fn, str)
+        if fn.startswith("disabled:"):
+            fn = fn.replace("disabled:", "", 1)
+            self.disabled = True
+        self.filename = fn
         Patch.__init__(self, p)
+
 
     def check(self):
         if not self.filename:
@@ -68,9 +97,14 @@ class FilePatch(Patch):
             raise KeyError("File patch is missing Name")
         Patch.check(self)
 
-    def __repr__(self):
-        return "<Patch: Filename {!r} Find {!r} Replace {!r} Comment {!r}>".format(
-            self.filename, self.find, self.replace, self.comment)
+    def _repr_list(self):
+        l = ["Filename", repr(self.filename)]
+        l.extend(Patch._repr_list(self))
+        return l
+
+    # def __repr__(self):
+    #     return "<FilePatch: Filename {!r} Find {!r} Replace {!r} Comment {!r} Disabled {!r}>".format(
+    #         self.filename, self.find, self.replace, self.comment, self.disabled)
 
     @classmethod
     def list_from_clover_config(cls, config):
