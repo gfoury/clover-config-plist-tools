@@ -86,3 +86,7 @@ for p in patches:
               p.comment, p.applied_count, p.applied_file_count)
     if p.applied_file_count == 0:
         log.warn("patch did not apply to any files: %r", p)
+    if p.has_expected and p.applied_count != p.expected:
+        matches = "s"[p.expected==1:]
+        log.warn("patch expected %d time%s, got %d: %r ", p.expected,
+                 matches, p.applied_count, p)
