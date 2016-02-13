@@ -1,0 +1,42 @@
+namespace a = "http://relaxng.org/ns/compatibility/annotations/1.0"
+
+plistObject =
+  array | data | date | dict | real | integer | \string | true | false
+plist = element plist { attlist.plist, plistObject }
+attlist.plist &= [ a:defaultValue = "1.0" ] attribute version { text }?
+
+# Collections
+array = element array { attlist.array, plistObject* }
+attlist.array &= empty
+dict = element dict { attlist.dict, (key, plistObject)* }
+attlist.dict &= empty
+key = element key { attlist.key, text }
+attlist.key &= empty
+
+# - Primitive types
+\string = element string { attlist.string, text }
+attlist.string &= empty
+data = element data { attlist.data, text }
+attlist.data &= empty
+
+# Contents interpreted as Base-64 encoded
+date = element date { attlist.date, text }
+attlist.date &= empty
+# Contents should conform to a subset of ISO 8601 (in particular, YYYY '-' MM '-' DD 'T' HH ':' MM ':' SS 'Z'.  Smaller units may be omitted with a loss of precision)
+
+# Numerical primitives
+true = element true { attlist.true, empty }
+attlist.true &= empty
+
+# Boolean constant true
+false = element false { attlist.false, empty }
+attlist.false &= empty
+
+# Boolean constant false
+real = element real { attlist.real, text }
+attlist.real &= empty
+
+# Contents should represent a floating point number matching ("+" | "-")? d+ ("."d*)? ("E" ("+" | "-") d+)? where d is a digit 0-9.
+integer = element integer { attlist.integer, text }
+attlist.integer &= empty
+start = plist
