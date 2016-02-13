@@ -5,10 +5,14 @@ log = logging.getLogger("patch")
 class Patch:
     def __init__(self, p):
         assert isinstance(p, dict)
-        self.find = p["Find"].data
-        assert isinstance(self.find, str)
-        self.replace = p["Replace"].data
-        assert isinstance(self.replace, str)
+        try:
+            self.find = p["Find"].data
+            assert isinstance(self.find, str)
+            self.replace = p["Replace"].data
+            assert isinstance(self.replace, str)
+        except KeyError:
+            log.error("malformed patch %r", p)
+            raise KeyError("malformed patch")
         self.comment = p.get("Comment")
         if self.comment is not None:
             assert isinstance(self.comment, str)
@@ -17,6 +21,8 @@ class Patch:
         self.has_expected = False
         self.expected = p.get("Expect")
         if self.expected is not None:
+            if isinstance(self.expected, str):
+                self.expected = int(self.expected)
             assert isinstance(self.expected, int)
             self.has_expected = True
         self.applied_count = 0
@@ -50,7 +56,7 @@ class Patch:
 
     def _repr_list(self):
         l = ["Find", repr(self.find), "Replace", repr(self.replace),
-             "Disabled", repr(self.disabled)]
+            "Disabled", repr(self.disabled)]
         if self.has_expected:
             l += ["Expect", repr(self.expected)]
         if self.comment:
@@ -73,10 +79,10 @@ class Patch:
             acpi = config["ACPI"]
             acpi_dsdt = acpi["DSDT"]
             acpi_dsdt_patches = acpi_dsdt["Patches"]
-            patches = map(Patch, acpi_dsdt_patches)
-            return patches
         except KeyError:
             raise KeyError("config.plist file is missing ACPI/DSDT/Patches section")
+        patches = map(Patch, acpi_dsdt_patches)
+        return patches
 
 
 class FilePatch(Patch):
@@ -118,7 +124,7 @@ class FilePatch(Patch):
         try:
             kexts_and_patches = config["KernelAndKextPatches"]
             kexts_to_patch = kexts_and_patches["KextsToPatch"]
-            filepatches = map(FilePatch, kexts_to_patch)
-            return filepatches
         except KeyError:
             raise KeyError("config.plist file is missing KernelAndKextPatches/KextToPatch section")
+        filepatches = map(FilePatch, kexts_to_patch)
+        return filepatches
