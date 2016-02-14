@@ -8,7 +8,7 @@ import argparse
 import logging
 import sys
 import plistmonkey
-#import logmonkey
+import logmonkey
 
 plistmonkey.rehabManHouseStyle = True
 plistmonkey.sortItems = False
@@ -22,9 +22,12 @@ parser = argparse.ArgumentParser(description="Test if Clover kext patches would 
 parser.add_argument("-a", "--enable-all",
                     help="Pretend all patches are enabled, but do not do replacements for disabled ones",
                     action="store_true")
+parser.add_argument("-r", "--running", help="Check against running kernel cache. The default is to search all kexts in /Library/Extensions and /System/Library/Extensions",
+                    action="store_true")
 parser.add_argument("-v", "--verbose", help="Be more verbose, -vv for more",
                     action="count")
 parser.add_argument("--expected", help="Produce a new plist on stdout with Expect counts", action="store_true")
+parser.add_argument("--ignore-kext-dupes", help="Don't warn about multiple kexts with the same name", action="store_true")
 parser.add_argument("config", help="path to config.plist", default="config.plist")
 
 args = parser.parse_args()
@@ -35,18 +38,36 @@ if args.verbose == 1:
 elif args.verbose >= 2:
     log.setLevel(logging.DEBUG)
 
-
-identifier_kext_to_kext_path = {}
-
+warn_dupes = not args.ignore_kext_dupes
 
 # Examples:
 # identifier_kext_to_kext_path["AppleHDA.kext"] ->
 #     "/System/Library/Extensions/AppleHDA.kext"
 #
-# I'm not sure Clover can patch the following, but I'm remembering the mapping anyway:
-#
 # identifier_kext_to_kext_path["AppleHDAHardwareConfigDriver.kext"] ->
 #     "/System/Library/Extensions/AppleHDA.kext/Contents/PlugIns/AppleHDAHardwareConfigDriver.kext"
+
+identifier_kext_to_kext_path = {}
+
+# In case the normal kext name doesn't match, try case-insensitive comparisons via
+# a squashed-to-lowercase table
+
+lcase_identifier_kext_to_kext_path = {}
+
+def add_bundle(basename, path):
+    warned = False
+    e = identifier_kext_to_kext_path.get(basename)
+    if warn_dupes and e and e != path:
+        log.warning("duplicate kext identifier {} {}".format(path, basename))
+        warned = True
+    identifier_kext_to_kext_path[basename] = path
+    lcase_basename = basename.lower()
+    lower_e = lcase_identifier_kext_to_kext_path.get(lcase_basename)
+    if warn_dupes and not warned:
+        if lower_e and lower_e != path:
+            log.warning("kext identifier differs only in case {} {} {}".format(path, e, basename))
+    lcase_identifier_kext_to_kext_path[lcase_basename] = path
+
 
 def read_name_translations_from(filename, directory_prefix):
     """Read the cache's KextIdentifiers list to get kext pathnames
@@ -54,7 +75,6 @@ def read_name_translations_from(filename, directory_prefix):
     :param filename: Path of compressed KextIdentifiers.plist
     :param directory_prefix: path prefix for kexts found here
     """
-
     with gzip.open(filename, "rb") as f:
         plist = f.read()
 
@@ -66,18 +86,25 @@ def read_name_translations_from(filename, directory_prefix):
         path = kext["OSBundlePath"]
         basename = os.path.basename(path)
         path = directory_prefix + path
+        add_bundle(basename, path)
 
-        e = identifier_kext_to_kext_path.get(basename)
-        if e:
-            log.warning("*** Warning duplicate identifier {} {} {}".format(path, e, basename))
-        identifier_kext_to_kext_path[basename] = path
+def walk_for_kexts(directory_prefix):
+    for root, dirs, files in os.walk('/System/Library/Extensions'):
+        for d in dirs:
+            if d.endswith(".kext"):
+                path = root + "/" + d
+                basename = d.replace(".kext", "")
+                add_bundle(d, path)
 
+if args.running:
+    sle_path = "/System/Library/Caches/com.apple.kext.caches/Directories/System/Library/Extensions/KextIdentifiers.plist.gz"
+    le_path = "/System/Library/Caches/com.apple.kext.caches/Directories/Library/Extensions/KextIdentifiers.plist.gz"
+    read_name_translations_from(sle_path, directory_prefix="/System/Library/Extensions/")
+    read_name_translations_from(le_path, directory_prefix="/Library/Extensions/")
+else:
+    walk_for_kexts("/System/Library/Extensions")
+    walk_for_kexts("/Library/Extensions")
 
-sle_path = "/System/Library/Caches/com.apple.kext.caches/Directories/System/Library/Extensions/KextIdentifiers.plist.gz"
-le_path = "/System/Library/Caches/com.apple.kext.caches/Directories/Library/Extensions/KextIdentifiers.plist.gz"
-
-read_name_translations_from(sle_path, directory_prefix="/System/Library/Extensions/")
-read_name_translations_from(le_path, directory_prefix="/Library/Extensions/")
 
 config_path = args.config
 
@@ -99,7 +126,13 @@ class Bundle:
         self.kext_name = name + ".kext"
 
     def find_filename(self):
-        fn = identifier_kext_to_kext_path[self.kext_name] + "/Contents/MacOS/" + self.name
+        kext_path = identifier_kext_to_kext_path.get(self.kext_name)
+        if not kext_path:
+            lcase = self.kext_name.lower()
+            kext_path = lcase_identifier_kext_to_kext_path.get(lcase)
+            if kext_path:
+                log.error("Filename case error %s: %r", self.kext_name, self)
+        fn = kext_path + "/Contents/MacOS/" + self.name
         if not os.path.exists(fn):
             # IOGraphicsFamily, for example
             fn = identifier_kext_to_kext_path[self.kext_name] + "/" + self.name
