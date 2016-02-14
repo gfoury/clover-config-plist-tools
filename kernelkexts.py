@@ -5,6 +5,18 @@ import plistlib
 import os.path
 import patch
 import argparse
+import logging
+import sys
+import plistmonkey
+#import logmonkey
+
+plistmonkey.rehabManHouseStyle = True
+plistmonkey.sortItems = False
+
+logging.basicConfig(format="%(levelname)-10s %(message)s")
+log = logging.getLogger("kernelkexts")
+
+
 
 parser = argparse.ArgumentParser(description="Test if Clover kext patches would apply")
 parser.add_argument("-a", "--enable-all",
@@ -12,10 +24,17 @@ parser.add_argument("-a", "--enable-all",
                     action="store_true")
 parser.add_argument("-v", "--verbose", help="Be more verbose, -vv for more",
                     action="count")
+parser.add_argument("--expected", help="Produce a new plist on stdout with Expect counts", action="store_true")
 parser.add_argument("config", help="path to config.plist", default="config.plist")
 
 args = parser.parse_args()
 verbose = args.verbose
+
+if args.verbose == 1:
+    log.setLevel(logging.INFO)
+elif args.verbose >= 2:
+    log.setLevel(logging.DEBUG)
+
 
 identifier_kext_to_kext_path = {}
 
@@ -50,7 +69,7 @@ def read_name_translations_from(filename, directory_prefix):
 
         e = identifier_kext_to_kext_path.get(basename)
         if e:
-            print "*** Warning duplicate identifier {} {} {}".format(path, e, basename)
+            log.warning("*** Warning duplicate identifier {} {} {}".format(path, e, basename))
         identifier_kext_to_kext_path[basename] = path
 
 
@@ -136,20 +155,18 @@ def is_disabled(p):
 
 
 for p in patches:
-    if verbose >= 2:
-        print p
+    log.debug("Found patch %r", p)
     if is_disabled(p):
         continue
     try:
         contents = Bundle.get_contents(p.filename)
     except KeyError:
-        print "*** No file found for {}".format(p.filename)
+        log.warning("No file found for %r", p)
         continue
     count = p.count(contents)
     if count:
         times = "s"[count == 1:]
-        if verbose >= 1:
-            print "Applied {} time{}: {}".format(count, times, p.comment)
+        log.info("Applied %d time%s: %s", count, times, p.comment)
         p.applied_count += count
         if p.disabled:
             # Even if we are ignoring Disabled for counting, do not apply
@@ -159,14 +176,18 @@ for p in patches:
             contents = p.apply(contents)
             Bundle.set_contents(p.filename, contents)
 
-boldon = "\x1b[1m"
-boldoff = "\x1b[0m"
 
 for p in patches:
     if is_disabled(p):
         continue
-    if p.applied_count == 0:
-        print boldon+"Warning, applied 0 times:"+boldoff, p.filename,":", p.comment
-    if p.has_expected and p.applied_count != p.expected:
-        print boldon+"Warning, expected"+boldoff, p.expected, "got", \
-            p.applied_count, "in", p.filename, p.comment
+    if p.has_expected:
+        if p.applied_count != p.expected:
+            log.error("expected %d, got %d in: %s: %s", p.expected,
+                p.applied_count, p.filename, p.comment)
+    elif p.applied_count == 0:
+        log.warning("applied 0 times %s: %s:", p.filename,p.comment)
+    else:
+        p.dict["Expect"] = p.applied_count
+
+if args.expected:
+    plistlib.writePlist(config_plist, sys.stdout)

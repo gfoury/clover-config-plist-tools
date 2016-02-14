@@ -3,8 +3,13 @@ import argparse
 import logging
 import os.path
 import plistlib
-
+import sys
 import patch
+#import logmonkey
+import plistmonkey
+
+plistmonkey.rehabManHouseStyle = True
+plistmonkey.sortItems = False
 
 logging.basicConfig(format="%(levelname)-8s %(message)s")
 log = logging.getLogger("cloverbinpatch")
@@ -24,6 +29,7 @@ parser.add_argument("-n", "--dry-run", help="Do not write any files", action="st
 parser.add_argument("-d", "--output-directory",
                     help="Directory for output files. Defaults to overwriting existing files.",
                     nargs=1)
+parser.add_argument("--expected", help="Produce a new plist on stdout with Expect counts", action="store_true")
 parser.add_argument('-v', '--verbose', action='count', help="Increase verbosity level")
 parser.add_argument("dsdt", type=argparse.FileType("rb"), nargs='+', metavar="DSDT.aml",
                     help="One or more DSDT.aml/SSDT.aml files.")
@@ -86,7 +92,13 @@ for p in patches:
               p.comment, p.applied_count, p.applied_file_count)
     if p.applied_file_count == 0:
         log.warn("patch did not apply to any files: %r", p)
-    if p.has_expected and p.applied_count != p.expected:
-        matches = "s"[p.expected==1:]
-        log.warn("patch expected %d time%s, got %d: %r ", p.expected,
+    elif p.has_expected:
+        if p.expected != p.applied_count:
+            matches = "s"[p.expected==1:]
+            log.error("patch expected %d time%s, got %d: %r ", p.expected,
                  matches, p.applied_count, p)
+    else:
+        p.dict["Expect"] = p.applied_count
+
+if args.expected:
+    plistlib.writePlist(config_plist, sys.stdout)

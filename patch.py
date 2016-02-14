@@ -5,6 +5,7 @@ log = logging.getLogger("patch")
 class Patch:
     def __init__(self, p):
         assert isinstance(p, dict)
+        self.dict = p
         try:
             self.find = p["Find"].data
             assert isinstance(self.find, str)
