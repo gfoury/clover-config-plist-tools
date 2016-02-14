@@ -5,13 +5,13 @@ import os.path
 import plistlib
 import sys
 import patch
-#import logmonkey
+import logmonkey
 import plistmonkey
 
 plistmonkey.rehabManHouseStyle = True
 plistmonkey.sortItems = False
 
-logging.basicConfig(format="%(levelname)-8s %(message)s")
+logging.basicConfig(format="%(levelname)-16s %(message)s")
 log = logging.getLogger("cloverbinpatch")
 
 
@@ -25,9 +25,8 @@ parser = argparse.ArgumentParser(
 parser.add_argument("-c", "--config", nargs=1, default="config.plist",
                     help="The clover config file. Defaults to config.plist.",
                     type=argparse.FileType("r"))
-parser.add_argument("-n", "--dry-run", help="Do not write any files", action="store_true")
 parser.add_argument("-d", "--output-directory",
-                    help="Directory for output files. Defaults to overwriting existing files.",
+                    help="Write patched AML files to directory",
                     nargs=1)
 parser.add_argument("--expected", help="Produce a new plist on stdout with Expect counts", action="store_true")
 parser.add_argument('-v', '--verbose', action='count', help="Increase verbosity level")
@@ -59,6 +58,7 @@ for f in args.dsdt:
     assert isinstance(f, file)
     basename = os.path.basename(f.name)
     unpatched = f.read()
+    f.close()
     patched = unpatched
     file_count = 0
     file_patch_count = 0
@@ -75,15 +75,9 @@ for f in args.dsdt:
     assert len(unpatched) == len(patched)
     if file_count == 0:
         log.info("-- file %s, no patches matched", f.name)
-    if not args.dry_run:
-        if output_dir:
-            f.close()
-            output_filename = os.path.join(output_dir, basename)
-            output_file = open(output_filename, "wb")
-        else:
-            name = f.name
-            f.close()
-            output_file = open(name, "wb")
+    if output_dir:
+        output_filename = os.path.join(output_dir, basename)
+        output_file = open(output_filename, "wb")
         output_file.write(patched)
         output_file.close()
 
