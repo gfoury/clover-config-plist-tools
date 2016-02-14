@@ -102,6 +102,9 @@ class FilePatch(Patch):
         if not self.filename:
             log.error("File patch is missing a name: %r", self)
             raise KeyError("File patch is missing Name")
+        if self.filename.endswith(".kext"):
+            log.warn("File patch name ends with .kext, fixing: %r", self)
+            self.filename = self.filename.replace(".kext", "")
         Patch.check(self)
 
     def _repr_list(self):
