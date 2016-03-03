@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(description="Test if Clover kext patches would 
 parser.add_argument("-a", "--enable-all",
                     help="Pretend all patches are enabled, but do not do replacements for disabled ones",
                     action="store_true")
-parser.add_argument("-r", "--running", help="Check against running kernel cache. The default is to search all kexts in /Library/Extensions and /System/Library/Extensions",
+parser.add_argument("-r", "--running", help="Check against only kexts listed in running kernel caches. The default is to search all kexts in /Library/Extensions and /System/Library/Extensions",
                     action="store_true")
 parser.add_argument("-v", "--verbose", help="Be more verbose, -vv for more",
                     action="count")
