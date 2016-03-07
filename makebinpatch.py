@@ -25,6 +25,9 @@ parser.add_argument("--hex", "-x",
                     help="Interpret arguments as hex rather than Python string syntax",
                     action="store_true")
 
+parser.add_argument("--file","-f",
+                    help="Kext filename to patch",
+                    nargs='?')
 group = parser.add_mutually_exclusive_group()
 group.add_argument("--whole", "-w",
                    help="Generate a complete plist, not just a stanza",
@@ -53,8 +56,14 @@ d = dict(Find=plistlib.Data(find), Replace=plistlib.Data(replace)) # , Disabled=
 if args.comment:
     d["Comment"] = args.comment
 
+if args.file:
+    d["Name"] = args.file
+
 if args.clover:
-    d = dict(ACPI=dict(DSDT=dict(Patches=[d])))
+    if args.file:
+        d = dict(KernelAndKextPatches=dict(KextsToPatch=[d]))
+    else:
+        d = dict(ACPI=dict(DSDT=dict(Patches=[d])))
 
 if args.whole or args.clover:
     plistlib.writePlist(d, sys.stdout)
