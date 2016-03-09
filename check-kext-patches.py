@@ -28,6 +28,16 @@ parser.add_argument("-v", "--verbose", help="Be more verbose, -vv for more",
                     action="count")
 parser.add_argument("--expected", help="Produce a new plist on stdout with Expect counts", action="store_true")
 parser.add_argument("--ignore-kext-dupes", help="Don't warn about multiple kexts with the same name", action="store_true")
+output_group = parser.add_argument_group("Output kext", "Given a named kext, output the file before or after patching")
+output_group.add_argument("--output-kext", help="Name of kext to write", nargs=1, metavar="KEXT_NAME")
+output_group.add_argument("--output-kext-before",
+                    help="File to write named kext, before patching",
+                    metavar="FILE_BEFORE",
+                    type=argparse.FileType("wb"))
+output_group.add_argument("--output-kext-after",
+                    help="File to write named kext, after patching",
+                    metavar="FILE_AFTER",
+                    type=argparse.FileType("wb"))
 parser.add_argument("config", help="path to config.plist", default="config.plist")
 
 args = parser.parse_args()
@@ -186,6 +196,10 @@ def is_disabled(p):
         return False
     return p.disabled
 
+if args.output_kext_before:
+    before_binary = Bundle.get_contents(args.output_kext[0])
+    args.output_kext_before.write(before_binary)
+    args.output_kext_before.close()
 
 for p in patches:
     log.debug("Found patch %r", p)
@@ -208,6 +222,11 @@ for p in patches:
         else:
             contents = p.apply(contents)
             Bundle.set_contents(p.filename, contents)
+
+if args.output_kext_after:
+    after_binary = Bundle.get_contents(args.output_kext[0])
+    args.output_kext_after.write(after_binary)
+    args.output_kext_after.close()
 
 
 for p in patches:
